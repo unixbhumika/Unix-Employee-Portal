@@ -325,7 +325,6 @@ function seedPettyCash() {
 }
 
 /* ------------------------------------------------------------------ */
-
 /*  Date / leave math helpers                                           */
 /* ------------------------------------------------------------------ */
 // weekendMode: 'sat_sun' (Admin \u2014 standard 5-day week) or 'sun_only' (everyone else \u2014 Mon-Sat working, only Sunday off)
@@ -1254,7 +1253,7 @@ function LeaveTab({ user, leaveUsage, myRequests, onApply, hideTitle }) {
                 {availableTypes.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Start Date</label>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ borderColor: C.border, color: C.ink }} className="w-full border rounded-lg px-2.5 py-2 text-sm outline-none" />
@@ -1959,6 +1958,7 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
   const [selected, setSelected] = useState(months[0] || { year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState("");
+  const [pdfReady, setPdfReady] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkDone, setBulkDone] = useState(false);
   const p = calculatePayslip(user, selected.year, selected.month, leaveRequests, fuelBills, pettyCash);
@@ -1982,6 +1982,17 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
       document.head.appendChild(script);
     });
   }
+
+  // Load the PDF library as soon as this screen opens, not on click. Mobile browsers (especially iOS Safari)
+  // require file downloads to happen synchronously within the tap — if the library is still loading at click
+  // time, the "await" breaks that direct-user-gesture chain and the download can silently fail or misbehave.
+  useEffect(() => {
+    let cancelled = false;
+    loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => !!window.jspdf)
+      .then(() => { if (!cancelled) setPdfReady(true); })
+      .catch(() => { if (!cancelled) setPdfReady(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   async function downloadPDF() {
     setPdfError(""); setPdfBusy(true);
@@ -2166,7 +2177,7 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
               style={{ background: C.ink }}
               className="text-white text-xs font-semibold rounded-lg px-3.5 py-2 flex items-center gap-1.5 hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              <FileCheck2 size={13} /> {pdfBusy ? "Preparing PDF\u2026" : "Download PDF"}
+              <FileCheck2 size={13} /> {pdfBusy ? "Preparing PDF\u2026" : !pdfReady ? "Loading PDF tool\u2026" : "Download PDF"}
             </button>
             <button
               type="button"
@@ -2178,7 +2189,7 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
               style={{ color: C.slate, borderColor: C.border }}
               className="text-xs font-semibold border rounded-lg px-3 py-2 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
             >
-              <Printer size={13} /> Download HTML
+              <Printer size={13} /> Download HTML (backup)
             </button>
             {user.role === "admin" && (
               <button
@@ -2205,7 +2216,7 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
           )}
 
           <p style={{ color: C.muted }} className="text-xs -mt-2">
-            PDF generates directly. The HTML option is a fallback — open it in your browser and use Ctrl/Cmd+P if PDF download doesn't work on your network.
+            "Download PDF" saves the file directly — wait for it to say "Loading PDF tool..." before tapping, especially on mobile. "Download HTML (backup)" opens a webpage version you can print or save as PDF via your browser's Print menu if the direct download doesn't work.
           </p>
 
           {generated ? (
@@ -2292,8 +2303,8 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
               </div>
 
               <div style={{ borderColor: C.border }} className="border rounded-lg overflow-hidden mb-6">
-                <div className="grid grid-cols-2">
-                  <div style={{ borderColor: C.border }} className="border-r">
+                <div className="grid grid-cols-1 sm:grid-cols-2">
+                  <div style={{ borderColor: C.border }} className="border-b sm:border-b-0 sm:border-r">
                     <div style={{ background: C.panel, borderColor: C.borderSoft }} className="border-b px-3 py-2">
                       <span style={{ color: C.slate }} className="text-xs font-bold uppercase tracking-wide">Earnings</span>
                     </div>
@@ -3092,7 +3103,7 @@ function EmployeeFormModal({ employee, employees, onSave, onClose }) {
             <input value={form.name} onChange={(e) => update("name", e.target.value)} style={{ borderColor: C.border }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Date of Birth</label>
               <input type="date" value={form.dob} onChange={(e) => update("dob", e.target.value)} style={{ borderColor: C.border }} className="w-full border rounded-lg px-2.5 py-2 text-sm outline-none" />
@@ -3113,7 +3124,7 @@ function EmployeeFormModal({ employee, employees, onSave, onClose }) {
             <input value={form.passportNumber} onChange={(e) => update("passportNumber", e.target.value)} placeholder="e.g. N1234567" style={{ borderColor: C.border }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Username</label>
               <input value={form.username} onChange={(e) => update("username", e.target.value)} style={{ borderColor: C.border }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none" />
@@ -3154,7 +3165,7 @@ function EmployeeFormModal({ employee, employees, onSave, onClose }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Basic Salary (AED)</label>
               <input type="number" min="0" value={form.basicSalary} onChange={(e) => update("basicSalary", e.target.value)} style={{ borderColor: C.border }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none" />

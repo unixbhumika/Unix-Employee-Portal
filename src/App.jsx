@@ -785,7 +785,7 @@ function LoginScreen({ employees, onLogin }) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="e.g. fatima.emp"
+                  placeholder="e.g. rahul.se"
                   style={{ borderColor: C.border, color: C.ink }}
                   className="w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2"
                   onFocus={(e) => (e.target.style.boxShadow = `0 0 0 3px ${C.red}22`)}
@@ -1100,14 +1100,33 @@ function OverviewTab({ user, employees, leaveUsage, myRequests, teamCount, pendi
 /* ------------------------------------------------------------------ */
 /*  Profile tab                                                         */
 /* ------------------------------------------------------------------ */
-function ProfileTab({ user, employees, onUpdateContact }) {
+function ProfileTab({ user, employees, onUpdateContact, onChangePassword }) {
   const [editing, setEditing] = useState(false);
   const [contact, setContact] = useState(user.contact);
   const supervisor = user.supervisorId ? employees.find((e) => e.id === user.supervisorId) : null;
 
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+
   function save() {
     onUpdateContact(user.id, contact);
     setEditing(false);
+  }
+
+  function submitPasswordChange() {
+    setPwError(""); setPwSuccess("");
+    if (currentPassword !== user.password) { setPwError("Current password is incorrect."); return; }
+    if (!newPassword || newPassword.length < 6) { setPwError("New password must be at least 6 characters."); return; }
+    if (newPassword !== confirmPassword) { setPwError("New password and confirmation don't match."); return; }
+    if (newPassword === currentPassword) { setPwError("New password must be different from your current password."); return; }
+    onChangePassword(user.id, newPassword);
+    setPwSuccess("Password updated successfully.");
+    setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    setTimeout(() => { setShowPasswordForm(false); setPwSuccess(""); }, 1800);
   }
 
   const fields = [
@@ -1177,6 +1196,75 @@ function ProfileTab({ user, employees, onUpdateContact }) {
             </div>
           )}
         </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div style={{ color: C.ink }} className="text-sm font-bold flex items-center gap-2"><Lock size={15} /> Password</div>
+          {!showPasswordForm && (
+            <button
+              type="button"
+              onClick={() => setShowPasswordForm(true)}
+              style={{ color: C.red }}
+              className="text-xs font-semibold"
+            >
+              Change Password
+            </button>
+          )}
+        </div>
+        {!showPasswordForm ? (
+          <p style={{ color: C.muted }} className="text-xs mt-1">Change your own password any time \u2014 no need to ask an Admin.</p>
+        ) : (
+          <div className="space-y-3 mt-4 max-w-sm">
+            <div>
+              <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                style={{ borderColor: C.border }}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div>
+              <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                style={{ borderColor: C.border }}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div>
+              <label style={{ color: C.muted }} className="block text-xs font-semibold uppercase tracking-wide mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ borderColor: C.border }}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            {pwError && <div style={{ color: C.red, background: "#FBE4E4" }} className="text-xs rounded-lg px-3 py-2 flex items-center gap-1.5"><AlertCircle size={13} />{pwError}</div>}
+            {pwSuccess && <div style={{ color: C.green, background: C.greenSoft }} className="text-xs rounded-lg px-3 py-2 flex items-center gap-1.5"><CheckCircle2 size={13} />{pwSuccess}</div>}
+            <div className="flex gap-2">
+              <button type="button" onClick={submitPasswordChange} style={{ background: C.red }} className="text-white text-xs font-semibold rounded-lg px-4 py-2 flex items-center gap-1.5 hover:opacity-90 transition-opacity">
+                <Save size={13} /> Update Password
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowPasswordForm(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPwError(""); }}
+                style={{ color: C.muted, borderColor: C.border }}
+                className="text-xs font-semibold border rounded-lg px-4 py-2"
+              >
+                Cancel
+              </button>
+            </div>
+            <p style={{ color: C.muted }} className="text-xs">Locked out and can't remember your current password? Ask your Admin to reset it for you via All Employees \u2192 Edit.</p>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -1953,6 +2041,17 @@ function downloadTextFile(filename, content, mimeType) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, payslips, onGenerate, onGenerateAll }) {
   const months = availablePayslipMonths(12);
   const [selected, setSelected] = useState(months[0] || { year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
@@ -2122,7 +2221,11 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
       doc.setFont("helvetica", "normal"); doc.setFontSize(8);
       doc.text(`Generated ${generated ? fmtDate(generated.generatedDate) : "as a live preview"}  \u00b7  This payslip is system generated; hence no signature or stamp is required.`, pageW / 2, y, { align: "center" });
 
-      doc.save(`Payslip_${user.id}_${monthStr}.pdf`);
+      // Use our own reliable Blob-download mechanism (same one the working HTML download uses)
+      // rather than jsPDF's built-in save(), which mobile browsers — especially iOS Safari —
+      // handle inconsistently and can open inline instead of downloading.
+      const pdfBlob = doc.output("blob");
+      downloadBlob(`Payslip_${user.id}_${monthStr}.pdf`, pdfBlob);
     } catch (err) {
       setPdfError("Could not generate the PDF (this may be blocked by your network). Try the HTML download below instead, or check your connection and retry.");
     } finally {
@@ -2216,7 +2319,7 @@ function PayslipTab({ user, employees, leaveRequests, fuelBills, pettyCash, pays
           )}
 
           <p style={{ color: C.muted }} className="text-xs -mt-2">
-            "Download PDF" saves the file directly — wait for it to say "Loading PDF tool..." before tapping, especially on mobile. "Download HTML (backup)" opens a webpage version you can print or save as PDF via your browser's Print menu if the direct download doesn't work.
+            Wait for the button to say "Download PDF" (not "Loading...") before tapping, especially on mobile. If it opens as a webpage instead of saving, look for a Share or Download icon in your browser's toolbar to save it — this is a setting in some phone browsers, not something the button controls. "Download HTML (backup)" is an alternative that opens a printable webpage version.
           </p>
 
           {generated ? (
@@ -3676,6 +3779,12 @@ export default function EmployeePortal() {
     saveKey("hr-employees-v1", updated);
   }
 
+  function handleChangePassword(employeeId, newPassword) {
+    const updated = employees.map((e) => (e.id === employeeId ? { ...e, password: newPassword } : e));
+    setEmployees(updated);
+    saveKey("hr-employees-v1", updated);
+  }
+
   function handleAddEmployee(payload) {
     const newEmp = { id: generateEmployeeId(payload.role, employees), ...payload };
     const updated = [...employees, newEmp];
@@ -3757,7 +3866,7 @@ export default function EmployeePortal() {
             <OverviewTab user={currentUser} employees={employees} leaveUsage={leaveUsage} myRequests={myRequests} teamCount={teamCount} pendingForMe={pendingForMe} setActiveTab={setActiveTab} />
           )}
           {activeTab === "profile" && (
-            <ProfileTab user={currentUser} employees={employees} onUpdateContact={handleUpdateContact} />
+            <ProfileTab user={currentUser} employees={employees} onUpdateContact={handleUpdateContact} onChangePassword={handleChangePassword} />
           )}
           {activeTab === "requests" && (
             <RequestsHub
